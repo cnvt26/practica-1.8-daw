@@ -19,11 +19,11 @@ apt install apache2 -y
 # Instalamos PHP
 apt install php libapache2-mod-php php-mysql -y
 
+# Copiamos nuestro archivo de config de Apache
+cp ../conf/000-default.conf /etc/apache2/sites-available
+
 # Reiniciamos el servicio de Apache
 systemctl restart apache2
 
 # Copiamos nuestro archivo de prueba PHP a /var/www/html
 cp ../php/index.php /var/www/html
-
-# Instalamos mysql server
-apt install mysql-server -y
