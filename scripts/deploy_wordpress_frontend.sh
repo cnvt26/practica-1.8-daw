@@ -4,6 +4,16 @@ set -ex
 # Importamos las variables de entorno
 source .env
 
+# Habilitamos el módulo rewrite de Apache
+a2enmod rewrite
+
+# Editamos apache2.conf para permitir AllowOverride All en /var/www/
+# Esto permite que WordPress gestione sus propias URL (permalinks) y que funcione /secreto
+sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+
+# Reiniciamos Apache para aplicar los cambios de configuración INMEDIATAMENTE
+systemctl restart apache2
+
 # Eliminamos descargas previas de WP-CLI
 rm -f /tmp/wp-cli.phar
 
@@ -16,13 +26,14 @@ chmod +x /tmp/wp-cli.phar
 # Movemos wp-cli.phar a /usr/local/bin/wp
 mv /tmp/wp-cli.phar /usr/local/bin/wp
 
-# Eliminamos instalaciones previas de WordPress
+# Eliminamos instalaciones previas de WordPress (Limpieza)
 rm -rf /var/www/html/*
 
-# Descargamos WordPress en español en el directorio /var/www/html
+# Descargamos WordPress en español
 wp core download --locale=es_ES --path=/var/www/html --allow-root
 
-# Creamos el archivo wp-config.php
+# Creamos el archivo wp-config.php conectando al HOST REMOTO ($DB_HOST)
+# IMPORTANTE: Hay que asegurarse de que en el .env del frontend DB_HOST es la IP privada de la otra máquina
 wp config create \
   --dbname=$DB_NAME \
   --dbuser=$DB_USER \
@@ -41,18 +52,20 @@ wp core install \
   --path=/var/www/html \
   --allow-root  
 
-# Configuramos los enlaces permanentes
-  wp rewrite structure '/%postname%/' \
-    --path=/var/www/html \
-    --allow-root
 
-# Instalamos el plugin de WPS Hide Login
-  wp plugin install wps-hide-login --activate \
-    --path=/var/www/html \
-    --allow-root
+# Configuramos los enlaces permanentes (Permalinks)
+# Esto genera el archivo .htaccess
+wp rewrite structure '/%postname%/' --path=/var/www/html --allow-root
 
-# Configuramos una URL personalizada para la página de login
-  wp option update whl_page $URL_HIDE_LOGIN --path=/var/www/html --allow-root
+# Instalamos y activamos el plugin WPS Hide Login
+wp plugin install wps-hide-login --activate --path=/var/www/html --allow-root
 
-# Mofificamos el propietario y el grupo de /var/www/html a www-data
-  chown -R www-data:www-data /var/www/html
+# Configuramos la URL personalizada de login
+wp option update whl_page "$URL_HIDE_LOGIN" --path=/var/www/html --allow-root
+
+# Copiamos el .htaccess personalizado desde tu carpeta local a la web
+cp ../htaccess/.htaccess /var/www/html/.htaccess
+
+# Asignamos permisos finales correctos a todo el directorio
+chown -R www-data:www-data /var/www/html
+chmod -R 755 /var/www/html
